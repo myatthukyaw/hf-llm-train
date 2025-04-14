@@ -1,5 +1,4 @@
-# LLM Training Framework
-
+# LLM Training
 This repository contains scripts for efficiently fine-tuning Large Language Models (LLMs) using Parameter-Efficient Fine-Tuning (PEFT) and LoRA techniques.
 
 ## Feats
