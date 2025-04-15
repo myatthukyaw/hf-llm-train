@@ -5,13 +5,8 @@ from datasets import load_dataset
 from peft import PeftConfig, PeftModel
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 
+from utils.utils import load_prompt
 
-def get_prompt(dialog: str) -> str:
-    """Create a prompt for summarization."""
-    return f"""Summarize the following conversation:
-    {dialog}
-    Summary :
-    """
 
 def print_comparison(base_output: str, finetuned_output: str, ground_truth: str, model_type: str) -> None:
     """Print a comparison of base model, fine-tuned model, and ground truth."""
@@ -100,13 +95,14 @@ def main(args: argparse.Namespace) -> None:
     # Load finetuned model
     finetuned_model, finetuned_tokenizer = load_finetuned_model(
         args, base_tokenizer
-    ).eval()
+    )
+    finetuned_model.eval()
 
     # Select a test example
     dialog = dataset["test"][args.index]["dialogue"]
     ground_truth = dataset["test"][args.index]["summary"]
 
-    prompt = get_prompt(dialog)    
+    prompt = load_prompt(args.prompt_template, dialogue=dialog)
     print("Generating summaries...")
     base_output = generate_summary(base_model, base_tokenizer, prompt)
     finetuned_output = generate_summary(finetuned_model, finetuned_tokenizer, prompt)
@@ -118,6 +114,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--base-model", type=str, default="google/flan-t5-base", 
                         help="Base model for PEFT or tokenizer fallback (default: google/flan-t5-base)")
     parser.add_argument("--dataset-name", type=str, default="knkarthick/dialogsum", help="Dataset name")
+    parser.add_argument("--prompt-template", type=str, default="prompts/summarize.txt", help="Path to prompt template")
     parser.add_argument("--index", type=int, default=200, help="Index of the test example")
     parser.add_argument("--model-type", type=str, choices=["regular", "peft"], default=None, 
                         help="Type of model (regular or peft). If not specified, will be auto-detected.")

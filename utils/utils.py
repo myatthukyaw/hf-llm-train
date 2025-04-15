@@ -1,3 +1,24 @@
+def load_prompt_template(prompt_template_path: str) -> str:
+    """
+    Load a prompt template from a file.
+    """
+    with open(prompt_template_path, 'r') as f:
+        return f.read()
+
+def format_prompt(template: str, **kwargs) -> str:
+    """
+    Format a prompt template with the given variables.
+    """
+    return template.format(**kwargs)
+
+# For backward compatibility
+def load_prompt(prompt_template: str, **kwargs) -> str:
+    """
+    Load and format a prompt template in one step.
+    """
+    template = load_prompt_template(prompt_template)
+    return format_prompt(template, **kwargs)
+
 
 def print_trainable_model_parameters(model) -> str:
     """

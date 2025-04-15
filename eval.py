@@ -14,6 +14,8 @@ from transformers import AutoModelForSeq2SeqLM, AutoTokenizer, GenerationConfig
 from peft import PeftModel, PeftConfig
 from typing import Dict, List, Optional, Tuple, Union
 
+from utils.utils import load_prompt_template, format_prompt
+
 def set_seed(seed: int = 42) -> None:
     """Set seed for reproducibility."""
     np.random.seed(seed)
@@ -45,9 +47,6 @@ def load_model_and_tokenizer( model_path: str, device, base_model: str = None ) 
     except Exception as e:
         raise RuntimeError(f"Error loading model from {model_path}: {str(e)}")
 
-def create_prompt(dialogue: str, prompt_template: str) -> str:
-    """Create prompt from dialogue based on template."""
-    return prompt_template.format(dialogue=dialogue)
 
 def generate_summaries_batch(
     model: AutoModelForSeq2SeqLM, 
@@ -60,10 +59,11 @@ def generate_summaries_batch(
 ) -> list:
     """Generate summaries in batches for efficiency."""
     summaries = []
-    
+    template = load_prompt_template(prompt_template)  # Load template once
+
     for i in range(0, len(dialogues), batch_size):
         batch_dialogues = dialogues[i:i+batch_size]
-        prompts = [create_prompt(d, prompt_template) for d in batch_dialogues]
+        prompts = [format_prompt(template, dialogue=d) for d in batch_dialogues]  # Use loaded template
         
         inputs = tokenizer(
             prompts, padding=True, truncation=True, return_tensors="pt"
@@ -174,23 +174,21 @@ def parse_arugments()-> ArgumentParser:
     # Dataset params
     parser.add_argument("--dataset", type=str, default="knkarthick/dialogsum", help="Dataset to use")
     parser.add_argument("--split", type=str, default="test", help="Dataset split to use")
-    parser.add_argument("--num_samples", type=int, default=100, help="Number of samples to evaluate")
+    parser.add_argument("--num-samples", type=int, default=100, help="Number of samples to evaluate")
     
     # Model params
-    parser.add_argument("--base_model", type=str, default="google/flan-t5-base", help="Base model to evaluate")
-    parser.add_argument("--finetuned_model", type=str, required=True, help="Fine-tuned model to evaluate")
-    parser.add_argument("--prompt_template", type=str, 
-                        default="Summarize the following conversation.\n\n{dialogue}\n\nSummary:", 
-                        help="Prompt template for generation")
+    parser.add_argument("--base-model", type=str, default="google/flan-t5-base", help="Base model to evaluate")
+    parser.add_argument("--finetuned-model", type=str, required=True, help="Fine-tuned model to evaluate")
+    parser.add_argument("--prompt-template", type=str, default="prompts/summarize.txt", help="Path to prompt template")
     
     # Generation params
-    parser.add_argument("--batch_size", type=int, default=4, help="Batch size for generation")
-    parser.add_argument("--max_new_tokens", type=int, default=200, help="Maximum number of tokens to generate")
+    parser.add_argument("--batch-size", type=int, default=1, help="Batch size for generation")
+    parser.add_argument("--max-new-tokens", type=int, default=200, help="Maximum number of tokens to generate")
     
     # Evaluation params
     parser.add_argument("--metrics", nargs="+", default=["rouge", "bleu"], help="Metrics to compute")
-    parser.add_argument("--save_dir", type=str, default="runs/dialogue-summary/eval", help="Directory to save results")
-    parser.add_argument("--save_summaries", action="store_true", help="Whether to save generated summaries")
+    parser.add_argument("--save-dir", type=str, default="runs/dialogue-summary/eval", help="Directory to save results")
+    parser.add_argument("--save-summaries", action="store_true", help="Whether to save generated summaries")
     
     # Other params
     parser.add_argument("--seed", type=int, default=42, help="Random seed")

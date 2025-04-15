@@ -16,9 +16,14 @@ pip install -r requirements.txt
 
 ## Usage
 
-### Training
+### Finetuning
 
 ```bash
+# Full-finetuning
+python train.py --model google/flan-t5-base --dataset-name knkarthick/dialogsum --training-method full
+# Or
+
+# Parameter-Efficient Fine-Tuning - LORA
 python train.py --model google/flan-t5-base --dataset-name knkarthick/dialogsum --training-method peft
 ```
 
