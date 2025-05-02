@@ -1,11 +1,13 @@
 import argparse
 import os
 
-from datasets import load_dataset
 from peft import PeftConfig, PeftModel
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 
-from utils.utils import load_prompt
+from datasets import load_dataset
+
+from src.evaluation.evaluator import Evaluator
+#from src.utils.utils import load_prompt
 
 
 def print_comparison(base_output: str, finetuned_output: str, ground_truth: str, model_type: str) -> None:
@@ -60,57 +62,81 @@ def load_finetuned_model(args, base_tokenizer):
         # Create a separate base model instance for PEFT
         # if don't use the separate model ...
         peft_base_model = AutoModelForSeq2SeqLM.from_pretrained(args.base_model)
-        finetuned_model = PeftModel.from_pretrained(peft_base_model, args.model)
+        finetuned_model = PeftModel.from_pretrained(peft_base_model, args.finetuned_model)
         
         # Use the same tokenizer as the base model
         finetuned_tokenizer = base_tokenizer
     else:
         # Regular model loading
-        print(f"Loading fine-tuned model: {args.model}")
-        finetuned_model = AutoModelForSeq2SeqLM.from_pretrained(args.model)
+        print(f"Loading fine-tuned model: {args.finetuned_model}")
+        finetuned_model = AutoModelForSeq2SeqLM.from_pretrained(args.finetuned_model)
 
         # Try to load tokenizer with fallback
-        finetuned_tokenizer = load_tokenizer(args.model, args.base_model)
+        finetuned_tokenizer = load_tokenizer(args.finetuned_model, args.base_model)
     
     return finetuned_model, finetuned_tokenizer
 
 def main(args: argparse.Namespace) -> None:
     
     dataset = load_dataset(args.dataset_name)
+
+    evaluator = Evaluator(
+        device=args.device, 
+        prompt_template=args.prompt_template,
+    )
+    
+    # Load base model and tokenizer
+    print(f"Loading base model {args.base_model}...")
+    base_model, base_tokenizer = evaluator.load_model_and_tokenizer(
+        args.base_model
+    )
+    
+    # Load finetuned model and tokenizer
+    print(f"Loading fine-tuned model {args.finetuned_model}...")
+    finetuned_model, finetuned_tokenizer = evaluator.load_model_and_tokenizer(
+        args.finetuned_model, base_model = args.base_model
+    )
     
     # Auto-detect model type if not specified
     if args.model_type is None:
-        if is_peft_model(args.model):
+        if is_peft_model(args.finetuned_model):
             args.model_type = "peft"
-            print(f"Detected PEFT/LoRA model: {args.model}")
+            print(f"Detected PEFT/LoRA model: {args.finetuned_model}")
         else:
             args.model_type = "regular"
-            print(f"Using regular model: {args.model}")
-    
-    # Load the base model and tokenizer for comparison
-    print(f"Loading base model: {args.base_model}")
-    base_model = AutoModelForSeq2SeqLM.from_pretrained(args.base_model)
-    base_tokenizer = AutoTokenizer.from_pretrained(args.base_model)
-    
-    # Load finetuned model
-    finetuned_model, finetuned_tokenizer = load_finetuned_model(
-        args, base_tokenizer
-    )
-    finetuned_model.eval()
+            print(f"Using regular model: {args.finetuned_model}")
 
     # Select a test example
     dialog = dataset["test"][args.index]["dialogue"]
     ground_truth = dataset["test"][args.index]["summary"]
 
-    prompt = load_prompt(args.prompt_template, dialogue=dialog)
-    print("Generating summaries...")
-    base_output = generate_summary(base_model, base_tokenizer, prompt)
-    finetuned_output = generate_summary(finetuned_model, finetuned_tokenizer, prompt)
-    print_comparison(base_output, finetuned_output, ground_truth, args.model_type)
+    # prompt = load_prompt(args.prompt_template, dialogue=dialog)
+
+    # Generate summaries with base model
+    print("Generating summaries with base model...")
+    base_summaries = evaluator.generate_summaries(
+        base_model,
+        base_tokenizer,
+        [dialog]
+    )
+    
+    # Generate summaries with finetuned model
+    print("Generating summaries with finetuned model...")
+    finetuned_summaries = evaluator.generate_summaries(
+        finetuned_model, 
+        finetuned_tokenizer, 
+        [dialog]
+    )
+
+    # base_output = generate_summary(base_model, base_tokenizer, prompt)
+    # finetuned_output = generate_summary(finetuned_model, finetuned_tokenizer, prompt)
+    print_comparison(
+        base_summaries[0], finetuned_summaries[0], ground_truth, args.model_type
+    )
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model", type=str, default="google/flan-t5-base", help="Path to finetuned checkpoint")
+    parser.add_argument("--finetuned-model", type=str, default="google/flan-t5-base", help="Path to finetuned checkpoint")
     parser.add_argument("--base-model", type=str, default="google/flan-t5-base", 
                         help="Base model for PEFT or tokenizer fallback (default: google/flan-t5-base)")
     parser.add_argument("--dataset-name", type=str, default="knkarthick/dialogsum", help="Dataset name")
@@ -118,6 +144,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--index", type=int, default=200, help="Index of the test example")
     parser.add_argument("--model-type", type=str, choices=["regular", "peft"], default=None, 
                         help="Type of model (regular or peft). If not specified, will be auto-detected.")
+    parser.add_argument("--device", type=str, default="cuda", help="Device to use")
     return parser.parse_args()
 
 if __name__ == "__main__":

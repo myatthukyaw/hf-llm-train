@@ -1,5 +1,5 @@
-# LLM Training
-This repository contains scripts for efficiently fine-tuning Large Language Models (LLMs) using Parameter-Efficient Fine-Tuning (PEFT) and LoRA techniques.
+# Finetuning LLMs
+This repository contains scripts for efficiently fine-tuning Large Language Models (LLMs).
 
 ## Feats
 
@@ -31,6 +31,14 @@ Options:
 - `--training-method`: Choose between `peft` (parameter-efficient) or `full` (full fine-tuning)
 - `--precision`: Set precision format (`float16`, `bfloat16`, `float32`, `float64`)
 - `--subsample`: Use a subset of the dataset for faster iteration
+
+### RLHF
+
+Instruct fine-tuned LLM -> RLHF -> Human Aligned LLM
+
+RLHF making sure the model outputs the helpfullness and usefullness of input prompt, minimize harmfullness, avoid dangerous topic. 
+
+detoxifying llm
 
 ### Evaluation
 

@@ -1,2 +1,5 @@
+archive/
+wandb/
 runs/*
+test/*
 __pycache__/
